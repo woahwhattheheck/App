@@ -61,6 +61,8 @@ function useOptimisticSearchTracking({searchResults, queryJSON, transactions, re
     const [shouldDeferHeavySearchWork, setShouldDeferHeavySearchWork] = useState(() => !isSearchDataLoaded(searchResults, queryJSON) || hasPendingWriteOnMount);
     const [showPendingExpensePlaceholder, setShowPendingExpensePlaceholder] = useState(() => hasPendingWriteOnMount);
     const [isOptimisticTrackingCleared, setIsOptimisticTrackingCleared] = useState(false);
+    // Remember a pending creation through the gap before its search snapshot arrives.
+    const [isCreationLifecycleArmed, setIsCreationLifecycleArmed] = useState(() => hasPendingWriteOnMount);
 
     const clearOptimisticTracking = () => {
         const tracking = mutableRef.current;
@@ -73,6 +75,7 @@ function useOptimisticSearchTracking({searchResults, queryJSON, transactions, re
         setOptimisticWatchKey(undefined);
         setShowPendingExpensePlaceholder(false);
         setIsOptimisticTrackingCleared(true);
+        setIsCreationLifecycleArmed(false);
     };
 
     // Safety timeout: clear skeleton if the lifecycle hasn't resolved within 10s.
@@ -103,8 +106,19 @@ function useOptimisticSearchTracking({searchResults, queryJSON, transactions, re
     useEffect(() => {
         const tracking = mutableRef.current;
 
-        if (isOptimisticTrackingCleared || !tracking.hasPendingWriteOnMount) {
+        if (isOptimisticTrackingCleared) {
             return;
+        }
+
+        const watchedTx = transactions?.[optimisticWatchKey as `${typeof ONYXKEYS.COLLECTION.TRANSACTION}${string}`];
+        if (!tracking.hasPendingWriteOnMount) {
+            if (watchedTx?.pendingAction !== CONST.RED_BRICK_ROAD_PENDING_ACTION.ADD) {
+                return;
+            }
+            // The reserved channel may already be consumed while its creation is
+            // still pending. Arm the same cache/cleanup lifecycle for that case.
+            tracking.hasPendingWriteOnMount = true;
+            setIsCreationLifecycleArmed(true);
         }
 
         // Step 1: resolve watch key if not yet available.
@@ -125,7 +139,6 @@ function useOptimisticSearchTracking({searchResults, queryJSON, transactions, re
         if (tracking.hasSwappedFromParent) {
             return;
         }
-        const watchedTx = transactions?.[optimisticWatchKey as `${typeof ONYXKEYS.COLLECTION.TRANSACTION}${string}`];
         if (watchedTx?.reportID !== CONST.REPORT.SPLIT_REPORT_ID) {
             return;
         }
@@ -153,7 +166,13 @@ function useOptimisticSearchTracking({searchResults, queryJSON, transactions, re
             ? (optimisticWatchKey as `${typeof ONYXKEYS.COLLECTION.TRANSACTION}${string}`)
             : undefined;
         const optimisticTransaction = optimisticTransactionKey ? transactions?.[optimisticTransactionKey] : undefined;
-        if (!optimisticTransactionKey || !optimisticTransaction?.transactionID || searchData[optimisticTransactionKey] || optimisticTransaction.reportID === CONST.REPORT.SPLIT_REPORT_ID) {
+        if (
+            !optimisticTransactionKey ||
+            !optimisticTransaction?.transactionID ||
+            searchData[optimisticTransactionKey] ||
+            optimisticTransaction.reportID === CONST.REPORT.SPLIT_REPORT_ID ||
+            optimisticTransaction.pendingAction !== CONST.RED_BRICK_ROAD_PENDING_ACTION.ADD
+        ) {
             return searchData;
         }
 
@@ -194,20 +213,27 @@ function useOptimisticSearchTracking({searchResults, queryJSON, transactions, re
      */
     const rearmTracking = () => {
         const tracking = mutableRef.current;
+        if (tracking.rollbackTimeout) {
+            clearTimeout(tracking.rollbackTimeout);
+            tracking.rollbackTimeout = undefined;
+        }
         tracking.hasPendingWriteOnMount = true;
         tracking.isCleanedUp = false;
         tracking.hasSwappedFromParent = false;
         tracking.cachedOptimisticItem = null;
         setIsOptimisticTrackingCleared(false);
+        setIsCreationLifecycleArmed(true);
         setShowPendingExpensePlaceholder(true);
         const latestKey = getOptimisticWatchKey(CONST.DEFERRED_LAYOUT_WRITE_KEYS.SEARCH);
         tracking.optimisticWatchKey = latestKey;
         setOptimisticWatchKey(latestKey);
     };
 
+    const isPendingCreation =
+        transactions?.[optimisticWatchKey as `${typeof ONYXKEYS.COLLECTION.TRANSACTION}${string}`]?.pendingAction === CONST.RED_BRICK_ROAD_PENDING_ACTION.ADD;
     const trackingState: OptimisticTrackingState = {
         mutableRef,
-        optimisticWatchKey,
+        optimisticWatchKey: isCreationLifecycleArmed || isPendingCreation ? optimisticWatchKey : undefined,
         isOptimisticTrackingCleared,
         clearOptimisticTracking,
         setShowPendingExpensePlaceholder,
