@@ -29,7 +29,7 @@ jest.mock('@libs/telemetry/submitFollowUpAction', () => ({
 }));
 
 const TRANSACTION_ID = '42';
-const TRANSACTION_KEY = `${ONYXKEYS.COLLECTION.TRANSACTION}${TRANSACTION_ID}`;
+const TRANSACTION_KEY = `${ONYXKEYS.COLLECTION.TRANSACTION}${TRANSACTION_ID}` as const;
 const SEARCH_CHANNEL = CONST.DEFERRED_LAYOUT_WRITE_KEYS.SEARCH;
 const HASH = 123;
 type HookParams = Parameters<typeof useOptimisticSearchTracking>[0];
@@ -181,7 +181,7 @@ describe('optimistic Search creation lifecycle', () => {
             initialProps: makeProps(makeTransaction(CONST.RED_BRICK_ROAD_PENDING_ACTION.ADD)),
         });
         rerender(makeProps());
-        const nextKey = `${ONYXKEYS.COLLECTION.TRANSACTION}43`;
+        const nextKey = `${ONYXKEYS.COLLECTION.TRANSACTION}43` as const;
         reserveDeferredWriteChannel(SEARCH_CHANNEL);
         registerDeferredWrite(SEARCH_CHANNEL, jest.fn(), {optimisticWatchKey: nextKey});
         act(() => result.current.rearmTracking());
