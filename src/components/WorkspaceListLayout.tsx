@@ -1,17 +1,20 @@
 import {useMemoizedLazyExpensifyIcons} from '@hooks/useLazyAsset';
 import useLocalize from '@hooks/useLocalize';
+import useOnyx from '@hooks/useOnyx';
 import useResponsiveLayout from '@hooks/useResponsiveLayout';
 import useShouldDisplayButtonsInSeparateLine from '@hooks/useShouldDisplayButtonsInSeparateLine';
 import useThemeStyles from '@hooks/useThemeStyles';
 
 import Navigation from '@libs/Navigation/Navigation';
 
+import ONYXKEYS from '@src/ONYXKEYS';
 import ROUTES from '@src/ROUTES';
 import SCREENS from '@src/SCREENS';
 
 import React from 'react';
 import {View} from 'react-native';
 
+import {InlineDebugTabView} from './Navigation/DebugTabView';
 import NAVIGATION_TABS from './Navigation/NavigationTabBar/NAVIGATION_TABS';
 import TabBarBottomContent from './Navigation/TabBarBottomContent';
 import TopBarWithLoadingBar from './Navigation/TopBarWithLoadingBar';
@@ -84,6 +87,7 @@ function WorkspaceListLayout({children, activeTabKey, headerButton, headerCompon
 
     const {shouldUseNarrowLayout} = useResponsiveLayout();
     const shouldDisplayButtonsInSeparateLine = useShouldDisplayButtonsInSeparateLine();
+    const [isDebugModeEnabled] = useOnyx(ONYXKEYS.IS_DEBUG_MODE_ENABLED);
 
     const isWorkspacesListPage = activeTabKey === 'workspaces';
     const testID = isWorkspacesListPage ? 'WorkspacesListPage' : 'DomainsListPage';
@@ -123,6 +127,7 @@ function WorkspaceListLayout({children, activeTabKey, headerButton, headerCompon
 
                     {content}
                     {!shouldUseNarrowLayout && <OfflineIndicator style={styles.pl5} />}
+                    {!shouldUseNarrowLayout && !!isDebugModeEnabled && <InlineDebugTabView />}
                 </View>
             </View>
         </ScreenWrapper>
