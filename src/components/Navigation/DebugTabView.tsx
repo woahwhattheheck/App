@@ -13,7 +13,6 @@ import {useSidebarOrderedReportsState} from '@hooks/useSidebarOrderedReports';
 import useStyleUtils from '@hooks/useStyleUtils';
 import useTheme from '@hooks/useTheme';
 import useThemeStyles from '@hooks/useThemeStyles';
-import useWindowDimensions from '@hooks/useWindowDimensions';
 
 import createDynamicRoute from '@libs/Navigation/helpers/dynamicRoutesUtils/createDynamicRoute';
 import getFocusedLeafScreenName from '@libs/Navigation/helpers/getFocusedLeafScreenName';
@@ -129,38 +128,41 @@ function getSettingsRoute(status: IndicatorStatus | undefined, reimbursementAcco
     }
 }
 
-type Props = {
+type DebugTabViewProps = {
+    /** The navigation tab whose status the banner explains. */
     selectedTab: ValueOf<typeof NAVIGATION_TABS>;
 };
 
-function DebugTabView({selectedTab}: Props) {
-    const StyleUtils = useStyleUtils();
+type DebugTabViewData = {
+    indicator: string;
+    message: TranslationPaths;
+    navigateTo: () => void;
+};
+
+type DebugTabViewContentProps = {
+    /** The color of the status indicator. */
+    indicator: string;
+    /** The localized status message key. */
+    message: TranslationPaths;
+    /** Open the page where the status can be addressed. */
+    onPress: () => void;
+};
+
+function isOnFullWidthTabRoot(rootState: NavigationState | undefined): boolean {
+    const activeRoute = getActiveTabRoute(rootState);
+    if (!activeRoute) {
+        return false;
+    }
+    const focusedLeaf = getFocusedLeafScreenName(activeRoute.state) ?? activeRoute.name;
+    return focusedLeaf === SCREENS.WORKSPACES_LIST || focusedLeaf === SCREENS.DOMAINS_LIST;
+}
+
+function useDebugTabViewData(selectedTab: ValueOf<typeof NAVIGATION_TABS>): DebugTabViewData | undefined {
     const theme = useTheme();
-    const styles = useThemeStyles();
-    const {translate} = useLocalize();
-    const {shouldUseNarrowLayout} = useResponsiveLayout();
-    const {windowWidth} = useWindowDimensions();
     const [reimbursementAccount] = useOnyx(ONYXKEYS.REIMBURSEMENT_ACCOUNT);
     const reportAttributes = useReportAttributes();
     const {status, indicatorColor, indicatorPolicyID} = useIndicatorStatus();
     const {orderedReportIDs, chatTabBrickRoad} = useSidebarOrderedReportsState();
-    const icons = useMemoizedLazyExpensifyIcons(['DotIndicator']);
-
-    const isAtRoot = useRootNavigationState((rootState) => {
-        const activeRoute = getActiveTabRoute(rootState);
-        return activeRoute ? isTabRouteAtRoot(activeRoute) : false;
-    });
-
-    const isOnFullWidthTabRoot = useRootNavigationState((rootState) => {
-        const activeRoute = getActiveTabRoute(rootState);
-        if (!activeRoute) {
-            return false;
-        }
-        const focusedLeaf = getFocusedLeafScreenName(activeRoute.state) ?? activeRoute.name;
-        // Scoped to WORKSPACES_LIST — the only full-width tab root among the three tabs
-        // (Inbox/Settings/Workspaces) gated by the tab filter further below.
-        return focusedLeaf === SCREENS.WORKSPACES_LIST;
-    });
 
     const message = useMemo((): TranslationPaths | undefined => {
         if (selectedTab === NAVIGATION_TABS.INBOX) {
@@ -209,12 +211,50 @@ function DebugTabView({selectedTab}: Props) {
         }
     }, [selectedTab, chatTabBrickRoad, orderedReportIDs, reportAttributes, status, reimbursementAccount, indicatorPolicyID]);
 
-    if (
-        (shouldUseNarrowLayout && !isAtRoot) ||
-        !([NAVIGATION_TABS.INBOX, NAVIGATION_TABS.SETTINGS, NAVIGATION_TABS.WORKSPACES] as string[]).includes(selectedTab) ||
-        !indicator ||
-        !message
-    ) {
+    if (!([NAVIGATION_TABS.INBOX, NAVIGATION_TABS.SETTINGS, NAVIGATION_TABS.WORKSPACES] as string[]).includes(selectedTab) || !indicator || !message) {
+        return undefined;
+    }
+
+    return {indicator, message, navigateTo};
+}
+
+function DebugTabViewContent({indicator, message, onPress}: DebugTabViewContentProps) {
+    const StyleUtils = useStyleUtils();
+    const theme = useTheme();
+    const styles = useThemeStyles();
+    const {translate} = useLocalize();
+    const icons = useMemoizedLazyExpensifyIcons(['DotIndicator']);
+
+    return (
+        <View
+            testID="DebugTabView"
+            style={[StyleUtils.getBackgroundColorStyle(theme.cardBG), styles.p3, styles.flexRow, styles.justifyContentBetween, styles.alignItemsCenter]}
+        >
+            <View style={[styles.flexRow, styles.gap2, styles.flex1, styles.alignItemsCenter]}>
+                <Icon
+                    src={icons.DotIndicator}
+                    fill={indicator}
+                />
+                <Text style={[StyleUtils.getColorStyle(theme.text), styles.lh20]}>{translate(message)}</Text>
+            </View>
+            <Button onPress={onPress}>
+                <Button.Text>{translate('common.view')}</Button.Text>
+            </Button>
+        </View>
+    );
+}
+
+function DebugTabView({selectedTab}: DebugTabViewProps) {
+    const styles = useThemeStyles();
+    const {shouldUseNarrowLayout} = useResponsiveLayout();
+    const isAtRoot = useRootNavigationState((rootState) => {
+        const activeRoute = getActiveTabRoute(rootState);
+        return activeRoute ? isTabRouteAtRoot(activeRoute) : false;
+    });
+    const isFullWidthTabRoot = useRootNavigationState(isOnFullWidthTabRoot);
+    const data = useDebugTabViewData(selectedTab);
+
+    if (!data || (shouldUseNarrowLayout && !isAtRoot) || (!shouldUseNarrowLayout && isFullWidthTabRoot)) {
         return null;
     }
 
@@ -222,38 +262,51 @@ function DebugTabView({selectedTab}: Props) {
     const verticalAnchor = selectedTab === NAVIGATION_TABS.SETTINGS && !shouldUseNarrowLayout ? {top: 0} : {bottom: 0};
     if (shouldUseNarrowLayout) {
         positionStyle = {bottom: 0, left: 0, right: 0};
-    } else if (isOnFullWidthTabRoot) {
-        positionStyle = {...verticalAnchor, left: variables.navigationTabBarSize, width: windowWidth - variables.navigationTabBarSize};
     } else {
         positionStyle = {...verticalAnchor, left: variables.navigationTabBarSize, width: variables.sideBarWithLHBWidth - variables.cropBorderWidth};
     }
 
-    // pAbsolute is only applied on wide layouts. On narrow layout the bar is placed by its parent
-    // (above the bottom tab bar), so detaching it with absolute positioning breaks both the FAB
-    // and the DebugTabView's own placement.
+    // Narrow layouts keep the banner above the bottom tab bar so it does not displace the FAB.
     return (
         <View
             testID="DebugTabViewContainer"
             style={[shouldUseNarrowLayout ? positionStyle : {...styles.pAbsolute, ...positionStyle}]}
             pointerEvents="box-none"
         >
-            <View
-                testID="DebugTabView"
-                style={[StyleUtils.getBackgroundColorStyle(theme.cardBG), styles.p3, styles.flexRow, styles.justifyContentBetween, styles.alignItemsCenter]}
-            >
-                <View style={[styles.flexRow, styles.gap2, styles.flex1, styles.alignItemsCenter]}>
-                    <Icon
-                        src={icons.DotIndicator}
-                        fill={indicator}
-                    />
-                    {!!message && <Text style={[StyleUtils.getColorStyle(theme.text), styles.lh20]}>{translate(message)}</Text>}
-                </View>
-                <Button onPress={navigateTo}>
-                    <Button.Text>{translate('common.view')}</Button.Text>
-                </Button>
-            </View>
+            <DebugTabViewContent
+                indicator={data.indicator}
+                message={data.message}
+                onPress={data.navigateTo}
+            />
         </View>
     );
 }
 
+function InlineDebugTabView() {
+    const styles = useThemeStyles();
+    const {shouldUseNarrowLayout} = useResponsiveLayout();
+    const isFullWidthTabRoot = useRootNavigationState(isOnFullWidthTabRoot);
+    const data = useDebugTabViewData(NAVIGATION_TABS.WORKSPACES);
+
+    if (shouldUseNarrowLayout || !isFullWidthTabRoot || !data) {
+        return null;
+    }
+
+    // Reserve the banner's actual height in the list's column, including beside a side panel.
+    return (
+        <View
+            testID="DebugTabViewContainer"
+            style={styles.flexShrink0}
+            pointerEvents="box-none"
+        >
+            <DebugTabViewContent
+                indicator={data.indicator}
+                message={data.message}
+                onPress={data.navigateTo}
+            />
+        </View>
+    );
+}
+
+export {InlineDebugTabView};
 export default DebugTabView;
