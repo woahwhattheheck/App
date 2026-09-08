@@ -22,6 +22,7 @@ type SearchTableHeaderColumnProps = WithSentryLabel & {
     icon?: IconAsset;
     isActive: boolean;
     sortOrder: SortOrder;
+    defaultSortOrder?: SortOrder;
     isSortable?: boolean;
     containerStyle?: StyleProp<ViewStyle>;
 
@@ -35,6 +36,7 @@ export default function SortableHeaderText({
     text,
     icon,
     sortOrder,
+    defaultSortOrder = CONST.SEARCH.SORT_ORDER.DESC,
     isActive,
     textStyle,
     containerStyle,
@@ -76,7 +78,10 @@ export default function SortableHeaderText({
     const displayIcon = isActive;
     const activeColumnStyle = isSortable && isActive && styles.searchTableHeaderActive;
 
-    const nextSortOrder = isActive && sortOrder === CONST.SEARCH.SORT_ORDER.DESC ? CONST.SEARCH.SORT_ORDER.ASC : CONST.SEARCH.SORT_ORDER.DESC;
+    let nextSortOrder = defaultSortOrder;
+    if (isActive) {
+        nextSortOrder = sortOrder === CONST.SEARCH.SORT_ORDER.DESC ? CONST.SEARCH.SORT_ORDER.ASC : CONST.SEARCH.SORT_ORDER.DESC;
+    }
 
     return (
         <View style={containerStyle}>

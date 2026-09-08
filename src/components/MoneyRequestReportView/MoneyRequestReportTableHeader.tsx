@@ -42,6 +42,7 @@ function MoneyRequestReportTableHeader({
             ...getExpenseHeaders().map((header) => ({
                 ...header,
                 isColumnSortable: isSortableColumnName(header.columnName),
+                defaultSortOrder: header.columnName === CONST.SEARCH.TABLE_COLUMNS.DATE ? CONST.SEARCH.SORT_ORDER.ASC : undefined,
             })),
             {
                 columnName: CONST.SEARCH.TABLE_COLUMNS.COMMENTS,
