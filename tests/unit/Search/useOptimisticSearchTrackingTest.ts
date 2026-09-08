@@ -73,14 +73,12 @@ function useOptimisticLifecycle(props: HookParams) {
     const tracking = useOptimisticSearchTracking(props);
     const searchData = tracking.searchDataWithOptimisticTransaction;
     const sortedData = useMemo(() => {
-        return Object.keys(searchData ?? {}).flatMap((key) => {
-            if (!key.startsWith(ONYXKEYS.COLLECTION.TRANSACTION)) {
-                return [];
-            }
-            // Keys are narrowed by the collection prefix before looking up the transaction.
-            const transaction = searchData?.[key as `${typeof ONYXKEYS.COLLECTION.TRANSACTION}${string}`];
-            return transaction ? [buildTransactionRow(Number(transaction.transactionID), transaction.transactionID, {...transaction, errors: undefined})] : [];
-        });
+        return Object.keys(searchData ?? {})
+            .filter((key): key is `${typeof ONYXKEYS.COLLECTION.TRANSACTION}${string}` => key.startsWith(ONYXKEYS.COLLECTION.TRANSACTION))
+            .flatMap((key) => {
+                const transaction = searchData?.[key];
+                return transaction ? [buildTransactionRow(Number(transaction.transactionID), transaction.transactionID, {...transaction, errors: undefined})] : [];
+            });
     }, [searchData]);
     const stable = useStableOptimisticSortedData(sortedData, props.searchResults, tracking.trackingState);
     return {data: stable.stableSortedData, trackingState: tracking.trackingState, rearmTracking: tracking.rearmTracking};
