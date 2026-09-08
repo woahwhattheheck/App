@@ -160,7 +160,7 @@ function useOptimisticSearchTracking({searchResults, queryJSON, transactions, re
         tracking.hasSwappedFromParent = true;
         const rafID = requestAnimationFrame(() => setOptimisticWatchKey(childKey));
         return () => cancelAnimationFrame(rafID);
-    }, [isOptimisticTrackingCleared, optimisticWatchKey, transactions, watchedTx]);
+    }, [isOptimisticTrackingCleared, optimisticWatchKey, transactions, watchedTx?.pendingAction, watchedTx?.reportID, watchedTx?.transactionID]);
 
     // Augment search data with the optimistic transaction (before it appears in server snapshot).
     const searchDataWithOptimisticTransaction = (() => {
