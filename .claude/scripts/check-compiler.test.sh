@@ -46,7 +46,9 @@ expect_accept() {
         echo "Expected exactly one npm invocation for: $filepath" >&2
         exit 1
     fi
-    if [[ "$(cat "$NPM_LOG")" != "run react-compiler-compliance-check -- check src/ok.ts" ]]; then
+    local npm_command
+    npm_command="$(<"$NPM_LOG")"
+    if [[ "$npm_command" != "run react-compiler-compliance-check -- check src/ok.ts" ]]; then
         echo "Expected normalized repository-relative npm path for: $filepath" >&2
         exit 1
     fi
