@@ -11,6 +11,7 @@ readonly TEST_REPO="$TEMP_DIR/repo"
 readonly OUTSIDE_DIR="$TEMP_DIR/outside"
 readonly BIN_DIR="$TEMP_DIR/bin"
 readonly NPM_LOG="$TEMP_DIR/npm.log"
+export NPM_LOG
 
 mkdir -p "$TEST_REPO/.claude/scripts" "$TEST_REPO/src" "$OUTSIDE_DIR" "$BIN_DIR"
 cp "$SOURCE_SCRIPT" "$TEST_REPO/.claude/scripts/check-compiler.sh"
@@ -28,7 +29,7 @@ chmod +x "$BIN_DIR/npm"
 run_proxy() {
     (
         cd "$TEST_REPO"
-        NPM_LOG="$NPM_LOG" PATH="$BIN_DIR:$PATH" ./.claude/scripts/check-compiler.sh "$1"
+        PATH="$BIN_DIR:$PATH" ./.claude/scripts/check-compiler.sh "$1"
     )
 }
 
