@@ -6,6 +6,9 @@ on:
     branches: [main]
     paths: ['**.ts', '**.tsx', '**.md']
 
+permissions:
+  contents: read
+
 concurrency:
   group: validatecode-terminology-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -16,6 +19,8 @@ jobs:
     steps:
       - name: Checkout
         uses: useblacksmith/checkout@1c9394c220d293645707b625ba9d79685f093a8f # v1
+        with:
+          persist-credentials: false
 
       - name: Check validateCode terminology
         run: ./scripts/checkValidateCodeTerminology.sh
