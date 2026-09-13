@@ -8,6 +8,11 @@ on:
     branches: [main]
     paths-ignore: ['docs/articles/**/*.md', 'docs/redirects.csv', 'docs/assets/images/**']
 
+permissions:
+  contents: read
+  issues: read
+  pull-requests: write
+
 concurrency:
   group: pr-author-checklist-${{ github.event.pull_request.number }}
   cancel-in-progress: true
