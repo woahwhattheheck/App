@@ -2,9 +2,11 @@
 
 set -eu
 
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+readonly SCRIPT_DIR
 readonly SOURCE_SCRIPT="$SCRIPT_DIR/check-compiler.sh"
-readonly TEMP_DIR="$(mktemp -d)"
+TEMP_DIR="$(mktemp -d)"
+readonly TEMP_DIR
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 readonly TEST_REPO="$TEMP_DIR/repo"
@@ -42,6 +44,10 @@ expect_accept() {
     fi
     if [[ ! -s "$NPM_LOG" ]] || [[ "$(wc -l < "$NPM_LOG")" -ne 1 ]]; then
         echo "Expected exactly one npm invocation for: $filepath" >&2
+        exit 1
+    fi
+    if [[ "$(cat "$NPM_LOG")" != "run react-compiler-compliance-check -- check src/ok.ts" ]]; then
+        echo "Expected normalized repository-relative npm path for: $filepath" >&2
         exit 1
     fi
 }
