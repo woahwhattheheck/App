@@ -7,6 +7,12 @@ on:
     types: [opened, synchronize]
     branches: [main]
 
+concurrency:
+  # PR head updates supersede older validation runs. Issue comments are
+  # independent commands, so give every comment-triggered run its own group.
+  group: cla-${{ github.event_name == 'pull_request_target' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
+
 jobs:
   validate:
     if: ${{ github.event_name == 'pull_request_target' }}
