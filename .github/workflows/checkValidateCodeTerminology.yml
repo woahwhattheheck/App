@@ -6,6 +6,10 @@ on:
     branches: [main]
     paths: ['**.ts', '**.tsx', '**.md']
 
+concurrency:
+  group: validatecode-terminology-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: blacksmith-2vcpu-ubuntu-2404
