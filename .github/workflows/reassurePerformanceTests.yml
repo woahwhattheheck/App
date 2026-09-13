@@ -6,6 +6,10 @@ on:
     branches-ignore: [staging, production]
     paths-ignore: [docs/**, help/**, .github/**, contributingGuides/**, tests/**, '**.md', '**.sh']
 
+concurrency:
+  group: reassure-performance-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   baseline-perf-tests:
     if: ${{ github.actor != 'OSBotify' }}
