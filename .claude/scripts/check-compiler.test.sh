@@ -30,7 +30,7 @@ chmod +x "$BIN_DIR/npm"
 
 run_proxy() {
     (
-        cd "$TEST_REPO"
+        cd "$TEST_REPO" || exit 1
         PATH="$BIN_DIR:$PATH" ./.claude/scripts/check-compiler.sh "$1"
     )
 }
