@@ -5,6 +5,10 @@ on:
     types: [opened, synchronize]
     branches: [main]
 
+concurrency:
+  group: cspell-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   spellcheck:
     runs-on: blacksmith-2vcpu-ubuntu-2404
