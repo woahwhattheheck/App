@@ -25,8 +25,10 @@ if [[ "$FILEPATH" == /* || "$FILEPATH" == ".." || "$FILEPATH" == ../* || "$FILEP
     die "Invalid filepath (must stay inside the repository)"
 fi
 
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-readonly REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+readonly SCRIPT_DIR
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+readonly REPO_ROOT
 
 # Resolve the existing file before forwarding it so a repository-local symlink
 # cannot escape the boundary after passing the lexical checks. Node is already
