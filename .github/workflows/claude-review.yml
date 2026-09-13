@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout
         uses: useblacksmith/checkout@1c9394c220d293645707b625ba9d79685f093a8f # v1
+        with:
+          persist-credentials: false
 
       - name: Check contributor authorization
         id: gate
@@ -48,6 +50,7 @@ jobs:
         uses: useblacksmith/checkout@1c9394c220d293645707b625ba9d79685f093a8f # v1
         with:
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Setup Node
         if: steps.set-authorized.outputs.IS_AUTHORIZED == 'true'
