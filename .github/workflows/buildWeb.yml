@@ -27,6 +27,9 @@ on:
         description: Filename of the web sourcemap artifact
         value: ${{ jobs.build.outputs.SOURCEMAP_FILENAME }}
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build Web
@@ -42,6 +45,7 @@ jobs:
         uses: useblacksmith/checkout@1c9394c220d293645707b625ba9d79685f093a8f # v1
         with:
           ref: ${{ inputs.ref }}
+          persist-credentials: false
 
       - name: Create .env.adhoc file based on staging
         if: ${{ inputs.environment == 'adhoc' }}
