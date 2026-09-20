@@ -1,3 +1,4 @@
+import {WRITE_COMMANDS} from '@libs/API/types';
 import {putOnHold} from '@libs/actions/IOU/Hold';
 import {cancelPayment, completePaymentOnboarding, markReportPaymentReceived, payMoneyRequest} from '@libs/actions/IOU/PayMoneyRequest';
 import {requestMoney} from '@libs/actions/IOU/TrackExpense';
@@ -762,6 +763,60 @@ describe('actions/IOU/PayMoneyRequest', () => {
             });
 
             mockFetch?.resume?.();
+        });
+
+        it('preserves a server-corrected report total when PayMoneyRequest fails', async () => {
+            const staleTotal = 10000;
+            const correctedTotal = 10001;
+            const chatReport = {
+                ...createRandomReport(936590, undefined),
+                lastReadTime: DateUtils.getDBTime(),
+                lastVisibleActionCreated: DateUtils.getDBTime(),
+            };
+            const iouReport = {
+                ...createRandomReport(936591, undefined),
+                chatType: undefined,
+                type: CONST.REPORT.TYPE.IOU,
+                total: staleTotal,
+            };
+
+            await Onyx.set(`${ONYXKEYS.COLLECTION.REPORT}${iouReport.reportID}`, iouReport);
+            mockFetch.mockAPICommand(WRITE_COMMANDS.PAY_MONEY_REQUEST, () => ({
+                jsonCode: 400,
+                onyxData: [
+                    {
+                        onyxMethod: Onyx.METHOD.MERGE,
+                        key: `${ONYXKEYS.COLLECTION.REPORT}${iouReport.reportID}`,
+                        value: {total: correctedTotal},
+                    },
+                ],
+            }));
+
+            payMoneyRequest({
+                isASAPSubmitBetaEnabled: false,
+                conciergeChat: undefined,
+                paymentType: CONST.IOU.PAYMENT_TYPE.ELSEWHERE,
+                chatReport,
+                iouReport,
+                introSelected: undefined,
+                currentUserAccountID: CARLOS_ACCOUNT_ID,
+                currentUserLogin: CARLOS_EMAIL,
+                betas: [CONST.BETAS.ALL],
+                isSelfTourViewed: false,
+                userBillingGracePeriodEnds: undefined,
+                amountOwed: 0,
+                chatReportPolicy: chatReportPolicyFromChat(chatReport),
+                chatReportActions: undefined,
+                delegateAccountID: undefined,
+                isTrackIntentUser: false,
+                getCurrencyDecimals: getCurrencyDecimalsLocal,
+                rules: undefined,
+            });
+
+            await waitForBatchedUpdates();
+
+            const updatedIOUReport = await getOnyxValue(`${ONYXKEYS.COLLECTION.REPORT}${iouReport.reportID}`);
+            expect(updatedIOUReport?.total).toBe(correctedTotal);
         });
 
         describe('delegateAccountID forwarding', () => {
