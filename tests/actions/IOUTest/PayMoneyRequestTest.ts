@@ -1,3 +1,4 @@
+import {WRITE_COMMANDS} from '@libs/API/types';
 import {putOnHold} from '@libs/actions/IOU/Hold';
 import {cancelPayment, completePaymentOnboarding, markReportPaymentReceived, payMoneyRequest} from '@libs/actions/IOU/PayMoneyRequest';
 import {requestMoney} from '@libs/actions/IOU/TrackExpense';
@@ -777,6 +778,72 @@ describe('actions/IOU/PayMoneyRequest', () => {
             });
 
             mockFetch?.resume?.();
+        });
+
+        it('preserves server-corrected report fields while rolling back optimistic payment state', async () => {
+            const staleTotal = 10000;
+            const correctedTotal = 10001;
+            const chatReport = {
+                ...createRandomReport(936590, undefined),
+                lastReadTime: DateUtils.getDBTime(),
+                lastVisibleActionCreated: DateUtils.getDBTime(),
+            };
+            const iouReport = {
+                ...createRandomReport(936591, undefined),
+                chatType: undefined,
+                type: CONST.REPORT.TYPE.IOU,
+                total: staleTotal,
+            };
+
+            await Onyx.set(`${ONYXKEYS.COLLECTION.REPORT}${iouReport.reportID}`, iouReport);
+            mockFetch.mockAPICommand(WRITE_COMMANDS.PAY_MONEY_REQUEST, () => ({
+                jsonCode: 400,
+                onyxData: [
+                    {
+                        onyxMethod: Onyx.METHOD.MERGE,
+                        key: `${ONYXKEYS.COLLECTION.REPORT}${iouReport.reportID}`,
+                        value: {total: correctedTotal},
+                    },
+                ],
+            }));
+
+            payMoneyRequest({
+                isASAPSubmitBetaEnabled: false,
+                conciergeChat: undefined,
+                paymentType: CONST.IOU.PAYMENT_TYPE.ELSEWHERE,
+                chatReport,
+                iouReport,
+                introSelected: undefined,
+                currentUserAccountID: CARLOS_ACCOUNT_ID,
+                currentUserLogin: CARLOS_EMAIL,
+                betas: [CONST.BETAS.ALL],
+                isSelfTourViewed: false,
+                userBillingGracePeriodEnds: undefined,
+                amountOwed: 0,
+                chatReportPolicy: chatReportPolicyFromChat(chatReport),
+                chatReportActions: undefined,
+                delegateAccountID: undefined,
+                isTrackIntentUser: false,
+                getCurrencyDecimals: getCurrencyDecimalsLocal,
+                rules: undefined,
+            });
+
+            await waitForBatchedUpdates();
+
+            const updatedIOUReport = await getOnyxValue(`${ONYXKEYS.COLLECTION.REPORT}${iouReport.reportID}`);
+            expect(updatedIOUReport?.total).toBe(correctedTotal);
+            expect(updatedIOUReport?.lastMessageText ?? null).toBe(iouReport.lastMessageText ?? null);
+            expect(updatedIOUReport?.lastMessageHtml ?? null).toBe(iouReport.lastMessageHtml ?? null);
+            expect(updatedIOUReport?.lastVisibleActionCreated ?? null).toBe(iouReport.lastVisibleActionCreated ?? null);
+            expect(updatedIOUReport?.hasOutstandingChildRequest ?? null).toBe(iouReport.hasOutstandingChildRequest ?? null);
+            expect(updatedIOUReport?.statusNum ?? null).toBe(iouReport.statusNum ?? null);
+            expect(updatedIOUReport?.stateNum ?? null).toBe(iouReport.stateNum ?? null);
+            expect(updatedIOUReport?.pendingFields?.preview ?? null).toBe(iouReport.pendingFields?.preview ?? null);
+            expect(updatedIOUReport?.pendingFields?.reimbursed ?? null).toBe(iouReport.pendingFields?.reimbursed ?? null);
+            expect(updatedIOUReport?.pendingFields?.partial ?? null).toBe(iouReport.pendingFields?.partial ?? null);
+            expect(updatedIOUReport?.pendingFields?.nextStep ?? null).toBe(iouReport.pendingFields?.nextStep ?? null);
+            expect(updatedIOUReport?.nextStep ?? null).toEqual(iouReport.nextStep ?? null);
+            expect(updatedIOUReport?.errors ?? null).toEqual(iouReport.errors ?? null);
         });
 
         describe('delegateAccountID forwarding', () => {
