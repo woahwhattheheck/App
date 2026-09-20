@@ -35,6 +35,32 @@ describe('OnboardingFlow', () => {
             expect(path).toBe('/onboarding');
         });
 
+        it.each([
+            ['private domain with accessible policies and no saved route', false, true, '', false, '/onboarding/personal-details'],
+            ['public domain with accessible policies while unvalidated', true, true, '', false, '/onboarding/work-email'],
+            ['private domain with accessible policies and a saved work-email route', false, true, '/onboarding/work-email', true, '/onboarding/work-email'],
+        ])('characterizes domain-classification routing: %s', (_label, isUserFromPublicDomain, hasAccessiblePolicies, onboardingInitialPath, isAccountValidated, expectedPath) => {
+            const params: GetOnboardingInitialPathParamsType = {
+                isUserFromPublicDomain,
+                hasAccessiblePolicies,
+                onboardingValuesParam: {
+                    hasCompletedGuidedSetupFlow: false,
+                    shouldRedirectToClassicAfterMerge: false,
+                    shouldValidate: false,
+                    isMergingAccountBlocked: false,
+                    isMergeAccountStepCompleted: false,
+                    signupQualifier: CONST.ONBOARDING_SIGNUP_QUALIFIERS.INDIVIDUAL,
+                },
+                currentOnboardingPurposeSelected: CONST.ONBOARDING_CHOICES.MANAGE_TEAM,
+                currentOnboardingCompanySize: CONST.ONBOARDING_COMPANY_SIZE.SMALL,
+                onboardingInitialPath,
+                onboardingValues: undefined,
+                isAccountValidated,
+            };
+
+            expect(getOnboardingInitialPath(params)).toBe(expectedPath);
+        });
+
         it('should return the correct path for personal spend', () => {
             const params: GetOnboardingInitialPathParamsType = {
                 isUserFromPublicDomain: false,
