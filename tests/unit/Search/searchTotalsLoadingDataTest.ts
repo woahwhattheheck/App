@@ -2,6 +2,7 @@ import {search} from '@libs/actions/Search';
 import {makeRequestWithSideEffects, waitForWrites} from '@libs/API';
 import {READ_COMMANDS} from '@libs/API/types';
 import {isRecord} from '@libs/ObjectUtils';
+import {savedSearchIDToSearchKey} from '@libs/SearchKeyUtils';
 import {buildSearchQueryJSON} from '@libs/SearchQueryUtils';
 
 import CONST from '@src/CONST';
@@ -189,6 +190,49 @@ describe('search loading totals handling', () => {
         expect(makeRequestWithSideEffectsMock.mock.calls).toHaveLength(2);
         const queuedQuery: unknown = JSON.parse(getLastSearchRequestJSON());
         expect(queuedQuery).toEqual(expect.objectContaining({shouldCalculateTotals: true}));
+    });
+
+    it('re-fires an in-flight ad-hoc search with totals under the saved-search key after save handoff', async () => {
+        const queryJSON = getQueryJSON('type:expense merchant:walmart');
+        const response = buildSearchResponse(0, true);
+        const savedSearchKey = savedSearchIDToSearchKey('123456789');
+        let resolveFirstRequest: (value: SearchResponse) => void = () => {};
+        const firstRequestPromise = new Promise<SearchResponse>((resolve) => {
+            resolveFirstRequest = resolve;
+        });
+        makeRequestWithSideEffectsMock.mockImplementationOnce(() => firstRequestPromise);
+
+        const firstSearch = search({
+            queryJSON,
+            searchKey: CONST.SEARCH.SEARCH_KEYS.EXPENSES,
+            offset: 0,
+            shouldCalculateTotals: false,
+            isLoading: false,
+        });
+
+        search({
+            queryJSON,
+            searchKey: savedSearchKey,
+            offset: 0,
+            shouldCalculateTotals: true,
+            isLoading: false,
+        });
+
+        await Promise.resolve();
+        expect(makeRequestWithSideEffectsMock.mock.calls).toHaveLength(1);
+
+        resolveFirstRequest(response);
+        await firstSearch;
+        await Promise.resolve();
+
+        expect(makeRequestWithSideEffectsMock.mock.calls).toHaveLength(2);
+        const queuedQuery: unknown = JSON.parse(getLastSearchRequestJSON());
+        expect(queuedQuery).toEqual(
+            expect.objectContaining({
+                searchKey: savedSearchKey,
+                shouldCalculateTotals: true,
+            }),
+        );
     });
 
     it('queues a totals request for expense-report when a non-totals search is already in flight', async () => {
