@@ -1,11 +1,17 @@
 import {render} from '@testing-library/react-native';
 
+import FormProvider from '@components/Form/FormProvider';
 import useFilterFeedValue from '@components/Search/hooks/useFilterFeedValue';
 import useFilterTaxRateValue from '@components/Search/hooks/useFilterTaxRateValue';
 
 import useLocalize from '@hooks/useLocalize';
 import useOnyx from '@hooks/useOnyx';
 
+import {saveSearch} from '@libs/actions/Search';
+import Navigation from '@libs/Navigation/Navigation';
+import {rand64} from '@libs/NumberUtils';
+import {savedSearchIDToSearchKey} from '@libs/SearchKeyUtils';
+import {buildSearchQueryJSON} from '@libs/SearchQueryUtils';
 import * as SearchUIUtils from '@libs/SearchUIUtils';
 
 import SearchSavePage from '@pages/Search/SearchSavePage';
@@ -13,7 +19,9 @@ import SearchSavePage from '@pages/Search/SearchSavePage';
 import CONST from '@src/CONST';
 import ONYXKEYS from '@src/ONYXKEYS';
 import type {SearchAdvancedFiltersForm} from '@src/types/form';
+import INPUT_IDS from '@src/types/form/SearchSaveForm';
 import type {Card, CardList} from '@src/types/onyx';
+import type {SearchQueryJSON} from '@components/Search/types';
 
 import React from 'react';
 
@@ -26,8 +34,9 @@ jest.mock('@components/HeaderWithBackButton', () => jest.fn(() => null));
 jest.mock('@components/ScreenWrapper', () => jest.fn((props: React.PropsWithChildren) => props.children));
 jest.mock('@components/Search/hooks/useFilterFeedValue');
 jest.mock('@components/Search/hooks/useFilterTaxRateValue');
+let mockCurrentSearchQueryJSON: SearchQueryJSON | undefined;
 jest.mock('@components/Search/SearchContext', () => ({
-    useSearchQueryContext: jest.fn(() => ({currentSearchQueryJSON: undefined, currentDefaultSearchQueryFilterKeys: new Set<string>()})),
+    useSearchQueryContext: jest.fn(() => ({currentSearchQueryJSON: mockCurrentSearchQueryJSON, currentDefaultSearchQueryFilterKeys: new Set<string>()})),
 }));
 jest.mock('@expensify/react-native-hybrid-app', () => ({__esModule: true, default: {isHybridApp: jest.fn(() => false)}}));
 jest.mock('@hooks/useAutoFocusInput', () => jest.fn(() => ({inputCallbackRef: jest.fn()})));
@@ -35,6 +44,9 @@ jest.mock('@hooks/useCurrencyList', () => ({useCurrencyListActions: jest.fn(() =
 jest.mock('@hooks/useLocalize');
 jest.mock('@hooks/useOnyx');
 jest.mock('@hooks/useThemeStyles', () => jest.fn(() => ({})));
+jest.mock('@libs/actions/Search', () => ({saveSearch: jest.fn()}));
+jest.mock('@libs/Navigation/Navigation', () => ({__esModule: true, default: {dismissModal: jest.fn(), goBack: jest.fn(), setParams: jest.fn()}}));
+jest.mock('@libs/NumberUtils', () => ({rand64: jest.fn()}));
 const cards = createMock<CardList>({});
 cards[12] = createMock<Card>({cardID: 12, bank: CONST.COMPANY_CARD.FEED_BANK_NAME.UPLOAD, state: CONST.EXPENSIFY_CARD.STATE.OPEN, nameValuePairs: {cardTitle: 'Selected Alpha'}});
 cards[23] = createMock<Card>({cardID: 23, bank: CONST.COMPANY_CARD.FEED_BANK_NAME.UPLOAD, state: CONST.EXPENSIFY_CARD.STATE.OPEN, nameValuePairs: {cardTitle: 'Selected Beta'}});
@@ -53,7 +65,37 @@ jest.mocked(useOnyx).mockImplementation((key) => {
             return [undefined, {status: 'loaded'}];
     }
 });
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+    jest.clearAllMocks();
+    mockCurrentSearchQueryJSON = undefined;
+});
+
+it('switches the active search key to the saved search after the save modal transition', () => {
+    const queryJSON = buildSearchQueryJSON('type:expense merchant:walmart');
+    expect(queryJSON).toBeDefined();
+    if (!queryJSON) {
+        return;
+    }
+
+    const savedSearchID = '123456789';
+    mockCurrentSearchQueryJSON = queryJSON;
+    jest.mocked(rand64).mockReturnValue(savedSearchID);
+
+    render(<SearchSavePage />);
+
+    const formProps = jest.mocked(FormProvider).mock.calls.at(-1)?.[0] as unknown as {onSubmit: (values: Record<string, string>) => void};
+    formProps.onSubmit({[INPUT_IDS.NAME]: '  Walmart  '});
+
+    expect(saveSearch).toHaveBeenCalledWith({id: savedSearchID, queryJSON, newName: 'Walmart'});
+    expect(Navigation.dismissModal).toHaveBeenCalledTimes(1);
+    expect(Navigation.setParams).not.toHaveBeenCalled();
+
+    const dismissOptions = jest.mocked(Navigation.dismissModal).mock.calls[0]?.[0] as {afterTransition?: () => void};
+    dismissOptions.afterTransition?.();
+
+    expect(Navigation.setParams).toHaveBeenCalledWith({searchKey: savedSearchIDToSearchKey(savedSearchID)});
+});
+
 it.each([[['12']], [['12', '23']], [['123']]])('renders canonical card selection %j exactly', (cardID) => {
     form = {cardID, feed: ['feed-a', 'feed-b'], taxRate: ['tax-a', 'tax-b'], merchant: 'Coffee Shop'};
     const output = JSON.stringify(render(<SearchSavePage />).toJSON());
