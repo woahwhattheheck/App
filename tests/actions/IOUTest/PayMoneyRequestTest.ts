@@ -32,7 +32,7 @@ import type {MockFetch} from '../../utils/TestHelper';
 
 import createRandomPolicy from '../../utils/collections/policies';
 import createRandomReportAction from '../../utils/collections/reportActions';
-import {createRandomReport} from '../../utils/collections/reports';
+import {createExpenseReport, createPolicyExpenseChat, createRandomReport} from '../../utils/collections/reports';
 import createRandomTransaction from '../../utils/collections/transaction';
 import createMock from '../../utils/createMock';
 import getOnyxValue from '../../utils/getOnyxValue';
@@ -2058,6 +2058,88 @@ describe('actions/IOU/PayMoneyRequest', () => {
 
         afterEach(() => {
             mockFetch?.resume?.();
+        });
+
+        it('preserves a corrected server total when PayMoneyRequest fails after the cached amount changed', async () => {
+            const staleTotal = -10000;
+            const correctedTotal = -10001;
+            const policy = {
+                ...createRandomPolicy(93659, CONST.POLICY.TYPE.CORPORATE),
+                id: '93659-policy',
+                role: CONST.POLICY.ROLE.ADMIN,
+                owner: CARLOS_EMAIL,
+                ownerAccountID: CARLOS_ACCOUNT_ID,
+                approvalMode: CONST.POLICY.APPROVAL_MODE.BASIC,
+            };
+            const expenseReport: Report = {
+                ...createExpenseReport(9365901),
+                reportID: '93659-expense',
+                policyID: policy.id,
+                ownerAccountID: RORY_ACCOUNT_ID,
+                managerID: CARLOS_ACCOUNT_ID,
+                total: staleTotal,
+                unheldTotal: staleTotal,
+                nonReimbursableTotal: 0,
+                currency: CONST.CURRENCY.USD,
+                stateNum: CONST.REPORT.STATE_NUM.APPROVED,
+                statusNum: CONST.REPORT.STATUS_NUM.APPROVED,
+                parentReportID: undefined,
+                parentReportActionID: undefined,
+            };
+            const chatReport: Report = {
+                ...createPolicyExpenseChat(9365902),
+                reportID: '93659-chat',
+                policyID: policy.id,
+                ownerAccountID: CARLOS_ACCOUNT_ID,
+                iouReportID: expenseReport.reportID,
+            };
+            const reportKey = `${ONYXKEYS.COLLECTION.REPORT}${expenseReport.reportID}`;
+
+            await Onyx.set(reportKey, expenseReport);
+            await Onyx.set(`${ONYXKEYS.COLLECTION.REPORT}${chatReport.reportID}`, chatReport);
+            await Onyx.set(`${ONYXKEYS.COLLECTION.POLICY}${policy.id}`, policy);
+
+            mockFetch.mockAPICommand('PayMoneyRequest', () => ({
+                jsonCode: 400,
+                onyxData: [
+                    {
+                        onyxMethod: Onyx.METHOD.MERGE,
+                        key: reportKey,
+                        value: {total: correctedTotal},
+                    },
+                ],
+            }));
+
+            payMoneyRequest({
+                isASAPSubmitBetaEnabled: false,
+                conciergeChat: undefined,
+                paymentType: CONST.IOU.PAYMENT_TYPE.ELSEWHERE,
+                chatReport,
+                iouReport: expenseReport,
+                introSelected: undefined,
+                currentUserAccountID: CARLOS_ACCOUNT_ID,
+                currentUserLogin: CARLOS_EMAIL,
+                betas: [CONST.BETAS.ALL],
+                isSelfTourViewed: false,
+                userBillingGracePeriodEnds: undefined,
+                amountOwed: 0,
+                policy,
+                chatReportPolicy: policy,
+                chatReportActions: undefined,
+                delegateAccountID: undefined,
+                isTrackIntentUser: false,
+                getCurrencyDecimals: getCurrencyDecimalsLocal,
+                rules: undefined,
+                shouldPlaySuccessSound: false,
+            });
+            await waitForBatchedUpdates();
+
+            const reportAfterFailure = await getOnyxValue(reportKey);
+
+            // The server response is authoritative for the corrected amount. This currently
+            // reproduces #93659: request failureData MERGEs the stale cached report after
+            // response.onyxData, so main returns staleTotal here instead.
+            expect(reportAfterFailure?.total).toBe(correctedTotal);
         });
 
         it('pendingAction is not null after paying the money request', async () => {
