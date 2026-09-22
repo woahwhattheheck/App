@@ -417,8 +417,24 @@ function getPayMoneyRequestParams({
         {
             onyxMethod: Onyx.METHOD.MERGE,
             key: `${ONYXKEYS.COLLECTION.REPORT}${iouReport?.reportID}`,
+            // Only roll back fields that this request changed optimistically. The failure
+            // response may contain fresher server-owned report data (for example, a
+            // corrected total), so restoring the entire cached report would clobber it.
             value: {
-                ...iouReport,
+                lastMessageText: iouReport?.lastMessageText ?? null,
+                lastMessageHtml: iouReport?.lastMessageHtml ?? null,
+                lastVisibleActionCreated: iouReport?.lastVisibleActionCreated ?? null,
+                hasOutstandingChildRequest: iouReport?.hasOutstandingChildRequest ?? null,
+                statusNum: iouReport?.statusNum ?? null,
+                stateNum: iouReport?.stateNum ?? null,
+                pendingFields: {
+                    preview: iouReport?.pendingFields?.preview ?? null,
+                    reimbursed: iouReport?.pendingFields?.reimbursed ?? null,
+                    partial: iouReport?.pendingFields?.partial ?? null,
+                    nextStep: iouReport?.pendingFields?.nextStep ?? null,
+                },
+                nextStep: iouReport?.nextStep ?? null,
+                errors: iouReport?.errors ?? null,
             },
         },
     );
