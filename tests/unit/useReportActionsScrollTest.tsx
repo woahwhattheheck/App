@@ -359,6 +359,24 @@ describe('useReportActionsScroll', () => {
             expect(mockOpenReport).not.toHaveBeenCalled();
         });
 
+        it('keeps jumping to the unread marker on a second New Messages click', async () => {
+            const {result} = await renderScroll({unreadMarkerReportActionIndex: 3});
+
+            act(() => {
+                result.current.scrollToBottomAndMarkReportAsRead();
+                result.current.scrollToBottomAndMarkReportAsRead();
+            });
+
+            expect(mockSetIsFloatingMessageCounterVisible).toHaveBeenCalledWith(false);
+            expect(mockScrollToIndex).toHaveBeenCalledTimes(2);
+            expect(mockScrollToIndex).toHaveBeenNthCalledWith(1, 3);
+            expect(mockScrollToIndex).toHaveBeenNthCalledWith(2, 3);
+            expect(mockScrollToBottom).not.toHaveBeenCalled();
+            expect(mockMarkNewestActionAsRead).toHaveBeenCalledTimes(2);
+            expect(mockNavigate).not.toHaveBeenCalled();
+            expect(mockOpenReport).not.toHaveBeenCalled();
+        });
+
         it('navigates and opens the report when the newest action is not present', async () => {
             mockLastVisibleActionCreated = '2099-01-01 00:00:00.000';
 
