@@ -1,7 +1,7 @@
 import useResponsiveLayout from '@hooks/useResponsiveLayout';
 import useThemeStyles from '@hooks/useThemeStyles';
 
-import {isDirectFeed} from '@libs/CardUtils';
+import {getPlaidInstitutionId} from '@libs/CardUtils';
 
 import CONST from '@src/CONST';
 import type {CombinedCardFeed, CompanyCardFeedWithDomainID} from '@src/types/onyx/CardFeeds';
@@ -15,7 +15,7 @@ type WorkspaceCompanyCardsBalanceLabelsProps = {
     /** The currently selected feed, holding the balance data */
     selectedFeed: CombinedCardFeed | undefined;
 
-    /** Name of the selected feed, used to determine whether it is a Plaid (direct) feed */
+    /** Name of the selected feed, used to determine whether it is a Plaid feed */
     feedName: CompanyCardFeedWithDomainID | undefined;
 };
 
@@ -23,8 +23,8 @@ function WorkspaceCompanyCardsBalanceLabels({selectedFeed, feedName}: WorkspaceC
     const styles = useThemeStyles();
     const {shouldUseNarrowLayout} = useResponsiveLayout();
 
-    // Balance is only available for Plaid-connected (direct) feeds.
-    if (!isDirectFeed(feedName)) {
+    // Balance is only available for Plaid-connected feeds. OAuth-only direct feeds are intentionally out of scope.
+    if (!getPlaidInstitutionId(feedName)) {
         return null;
     }
 
