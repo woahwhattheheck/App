@@ -42,15 +42,7 @@ jest.mock('@hooks/useThemeStyles', () => () => ({
     searchTableHeaderActive: {},
 }));
 
-function pressHeader({
-    isActive,
-    sortOrder,
-    defaultSortOrder,
-}: {
-    isActive: boolean;
-    sortOrder: 'asc' | 'desc';
-    defaultSortOrder?: 'asc' | 'desc';
-}) {
+function pressHeader({isActive, sortOrder, defaultSortOrder}: {isActive: boolean; sortOrder: 'asc' | 'desc'; defaultSortOrder?: 'asc' | 'desc'}) {
     const onPress = jest.fn();
 
     render(
